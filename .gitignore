@@ -17,6 +17,9 @@ pnpm-debug.log*
 .env
 .env.production
 
+ARCHITECTURE.md
+palette_preview.py
+
 # wrangler
 .wrangler/
 
