@@ -1,0 +1,123 @@
+/* === Palette === */
+:root {
+  --color-bg:       #1e1c1a;
+  --color-surface:  #282828;
+  --color-elevated: #32302f;
+  --color-divider:  #504945;
+
+  --color-text:     #e8dcc8;
+  --color-heading:  #dfbf8e;
+  --color-muted:    #a89984;
+
+  --color-accent:   #e78a4e;
+  --color-teal:     #7daea3;
+  --color-code:     #a9b665;
+
+  /* Typography */
+  --font-serif: 'Lora', Georgia, serif;
+  --font-mono:  'Fira Mono', 'Courier New', monospace;
+
+  /* Spacing */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Layout */
+  --max-width: 720px;
+  --max-width-wide: 1080px;
+}
+
+/* === Reset === */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* === Base === */
+html {
+  font-size: 18px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-serif);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-mono);
+  color: var(--color-heading);
+  line-height: 1.2;
+}
+
+h1 { font-size: 2rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.125rem; }
+
+p {
+  max-width: 65ch;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--color-heading);
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  color: var(--color-code);
+  background: var(--color-elevated);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+pre {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  background: var(--color-elevated);
+  padding: var(--space-6);
+  border-radius: 6px;
+  overflow-x: auto;
+  border-left: 2px solid var(--color-divider);
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--color-divider);
+  margin: var(--space-8) 0;
+}
+
+/* === Layout helpers === */
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+.container--wide {
+  max-width: var(--max-width-wide);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}

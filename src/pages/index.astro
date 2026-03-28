@@ -1,17 +1,77 @@
 ---
-
+import Layout from '../layouts/Layout.astro';
+import NavCard from '../components/NavCard.astro';
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<Layout title="Patrick Meunier">
+  <main class="container">
+    <section class="hero">
+      <p class="hero__tagline">Everything is open source if you can read binary, even this website</p>
+      <h1 class="hero__name">Patrick Meunier</h1>
+      <p class="hero__sub">Programmer</p>
+    </section>
+
+    <nav class="nav-grid">
+      <NavCard
+        href="/projects"
+        title="Projects"
+        description="Things I've built and contributed to."
+      />
+      <NavCard
+        href="/blog"
+        title="Blog"
+        description="Long form, when I have something worth saying."
+      />
+      <NavCard
+        href="/graphics"
+        title="Graphics"
+        description="Canvas experiments and visual playgrounds."
+      />
+    </nav>
+  </main>
+</Layout>
+
+<style>
+  main {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100vh;
+    gap: var(--space-16);
+    padding-top: var(--space-16);
+    padding-bottom: var(--space-16);
+  }
+
+  .hero {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .hero__tagline {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--color-teal);
+    letter-spacing: 0.02em;
+    max-width: none;
+  }
+
+  .hero__name {
+    font-size: 3rem;
+    color: var(--color-heading);
+    line-height: 1;
+  }
+
+  .hero__sub {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--color-muted);
+    max-width: none;
+  }
+
+  .nav-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-4);
+  }
+</style>

@@ -1,0 +1,50 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Graphics — Patrick Meunier">
+  <main class="container">
+    <header class="page-header">
+      <a href="/" class="back">← home</a>
+      <h1>Graphics</h1>
+      <p class="subtitle">Experiments in canvas, WebGL, and things that move.</p>
+    </header>
+    <p class="placeholder">Nothing yet.</p>
+  </main>
+</Layout>
+
+<style>
+  main {
+    padding-top: var(--space-16);
+    padding-bottom: var(--space-16);
+  }
+
+  .page-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-bottom: var(--space-12);
+  }
+
+  .back {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--color-muted);
+    text-decoration: none;
+  }
+
+  .back:hover {
+    color: var(--color-accent);
+  }
+
+  .subtitle {
+    color: var(--color-muted);
+    font-size: 0.9rem;
+  }
+
+  .placeholder {
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+  }
+</style>
