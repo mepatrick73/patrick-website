@@ -1,0 +1,563 @@
+---
+---
+
+<canvas id="dust-canvas" aria-hidden="true"></canvas>
+<div class="grain"></div>
+<div class="vignette"></div>
+
+<script>
+  const canvas = document.getElementById('dust-canvas') as HTMLCanvasElement;
+  const ctx    = canvas.getContext('2d')!;
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = canvas.parentElement!.offsetHeight;
+  }
+  window.addEventListener('resize', resize);
+
+  const WIN_X = 52, WIN_Y = 52, WIN_R = 54;
+
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  const lerp  = (a: number, b: number, t: number)   => a + (b - a) * clamp(t, 0, 1);
+
+  let currentAngle = Math.PI / 5;
+  let targetAngle  = Math.PI / 5;
+
+  if (!reducedMotion) {
+    window.addEventListener('mousemove', (e) => {
+      const r = canvas.getBoundingClientRect();
+      targetAngle = Math.atan2(e.clientY - r.top - WIN_Y, e.clientX - r.left - WIN_X);
+    });
+  }
+
+  function updateAngle() {
+    currentAngle += (targetAngle - currentAngle) * 0.035;
+  }
+
+  function angleToTime(a: number) {
+    return clamp(a, 0, Math.PI * 0.75) / (Math.PI * 0.75);
+  }
+  function getTimeOfDay() { return angleToTime(currentAngle); }
+
+  function timeColor(t: number) {
+    if (t < 0.25) { const f = t / 0.25;    return { r: lerp(125,223,f), g: lerp(174,191,f), b: lerp(163,142,f) }; }
+    if (t < 0.5)  { const f = (t-.25)/.25; return { r: lerp(223,245,f), g: lerp(191,215,f), b: lerp(142,170,f) }; }
+    if (t < 0.75) { const f = (t-.5)/.25;  return { r: lerp(245,231,f), g: lerp(215,138,f), b: lerp(170,78, f) }; }
+                    const f = (t-.75)/.25;  return { r: lerp(231,180,f), g: lerp(138,70, f), b: lerp(78, 30, f) };
+  }
+  function rayIntensity(t: number) { return 0.35 + 0.65 * Math.sin(t * Math.PI); }
+
+  const FLOOR_Y = () => canvas.height * 0.78;
+
+  function beamFloorHit() {
+    const fy = FLOOR_Y();
+    const t  = (fy - WIN_Y) / Math.sin(currentAngle);
+    return WIN_X + Math.cos(currentAngle) * t;
+  }
+
+  function drawRoom() {
+    const tod = getTimeOfDay();
+    const col = timeColor(tod);
+    const intensity = rayIntensity(tod);
+    const fy  = FLOOR_Y();
+
+    // Base wall — warm earthen dark
+    ctx.fillStyle = '#1a1209';
+    ctx.fillRect(0, 0, canvas.width, fy);
+
+    // Ceiling darkens top edge
+    const ceiling = ctx.createLinearGradient(0, 0, 0, fy * 0.35);
+    ceiling.addColorStop(0, 'rgba(6,3,1,0.75)');
+    ceiling.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ceiling;
+    ctx.fillRect(0, 0, canvas.width, fy * 0.35);
+
+    // Warm light wash from porthole corner
+    const wallLit = ctx.createRadialGradient(0, 0, 0, 0, 0, canvas.width * 0.65);
+    wallLit.addColorStop(0,   `rgba(${col.r},${col.g},${col.b},${0.10 * intensity})`);
+    wallLit.addColorStop(0.5, `rgba(${col.r},${col.g},${col.b},${0.03 * intensity})`);
+    wallLit.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = wallLit;
+    ctx.fillRect(0, 0, canvas.width, fy);
+
+    // Far wall fades to dark
+    const wallShadow = ctx.createLinearGradient(canvas.width * 0.45, 0, canvas.width, 0);
+    wallShadow.addColorStop(0, 'rgba(0,0,0,0)');
+    wallShadow.addColorStop(1, 'rgba(5,3,1,0.52)');
+    ctx.fillStyle = wallShadow;
+    ctx.fillRect(0, 0, canvas.width, fy);
+
+    // Floor
+    const floorGrad = ctx.createLinearGradient(0, fy, 0, canvas.height);
+    floorGrad.addColorStop(0, '#120d07');
+    floorGrad.addColorStop(1, '#0a0805');
+    ctx.fillStyle = floorGrad;
+    ctx.fillRect(0, fy, canvas.width, canvas.height - fy);
+
+    // Floor line
+    ctx.beginPath();
+    ctx.moveTo(0, fy); ctx.lineTo(canvas.width, fy);
+    ctx.strokeStyle = 'rgba(60,40,20,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Light pool on floor
+    const hitX = beamFloorHit();
+    if (hitX > 0 && hitX < canvas.width * 1.5) {
+      ctx.save();
+      ctx.scale(1, 0.35);
+      const pool = ctx.createRadialGradient(
+        hitX, (fy+40)/0.35, 0, hitX, (fy+40)/0.35, canvas.width*0.38);
+      pool.addColorStop(0,    `rgba(${col.r},${col.g},${col.b},${0.18*intensity})`);
+      pool.addColorStop(0.35, `rgba(${col.r},${col.g},${col.b},${0.08*intensity})`);
+      pool.addColorStop(1,    'rgba(0,0,0,0)');
+      ctx.fillStyle = pool;
+      ctx.fillRect(-100, fy/0.35, canvas.width+200, (canvas.height-fy+60)/0.35);
+      ctx.restore();
+    }
+  }
+
+  const RAY_COUNT  = 12;
+  const rayOffsets = Array.from({ length: RAY_COUNT }, (_, i) => ({
+    angleOffset:  (i - RAY_COUNT / 2) * 0.06,
+    opacity:      0.04 + Math.random() * 0.06,
+    width:        0.07 + Math.random() * 0.10,
+    shimmerPhase: Math.random() * Math.PI * 2,
+  }));
+
+  function drawRays() {
+    const t   = getTimeOfDay();
+    const col = timeColor(t);
+    const intensity = rayIntensity(t);
+    const len = Math.max(canvas.width, canvas.height) * 2.4;
+    ctx.save();
+    ctx.filter = 'blur(22px)';
+    for (const ray of rayOffsets) {
+      const a = currentAngle + ray.angleOffset;
+      const shimmer = 0.88 + 0.12 * Math.sin(Date.now() * 0.00022 + ray.shimmerPhase);
+      const alpha   = ray.opacity * intensity * shimmer;
+      const ex = WIN_X + Math.cos(a)*len, ey = WIN_Y + Math.sin(a)*len;
+      const px = -Math.sin(a), py = Math.cos(a);
+      const hw = len * ray.width;
+      const grad = ctx.createLinearGradient(WIN_X, WIN_Y, ex, ey);
+      grad.addColorStop(0,    `rgba(${col.r},${col.g},${col.b},${alpha*1.4})`);
+      grad.addColorStop(0.15, `rgba(${col.r},${col.g},${col.b},${alpha})`);
+      grad.addColorStop(0.5,  `rgba(${col.r},${col.g},${col.b},${alpha*0.4})`);
+      grad.addColorStop(1,    `rgba(${col.r},${col.g},${col.b},0)`);
+      ctx.beginPath();
+      ctx.moveTo(WIN_X, WIN_Y);
+      ctx.lineTo(ex + px*hw, ey + py*hw);
+      ctx.lineTo(ex - px*hw, ey - py*hw);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+    ctx.filter = 'none';
+    ctx.restore();
+  }
+
+  function drawWindow() {
+    const t   = getTimeOfDay();
+    const col = timeColor(t);
+    const intensity = rayIntensity(t);
+    ctx.save();
+
+    const wallPatch = ctx.createRadialGradient(WIN_X, WIN_Y, WIN_R+2, WIN_X, WIN_Y, WIN_R+28);
+    wallPatch.addColorStop(0, 'rgba(45,32,18,0.95)');
+    wallPatch.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.arc(WIN_X, WIN_Y, WIN_R+28, 0, Math.PI*2);
+    ctx.fillStyle = wallPatch; ctx.fill();
+
+    ctx.beginPath(); ctx.arc(WIN_X, WIN_Y, WIN_R+7, 0, Math.PI*2);
+    ctx.fillStyle = '#2e1e0e'; ctx.fill();
+
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath(); ctx.arc(WIN_X, WIN_Y, WIN_R+6-i*1.5, 0, Math.PI*2);
+      ctx.strokeStyle = ['#3a2410','#2e1e0e','#3d2812','#261808'][i];
+      ctx.lineWidth = 1.5; ctx.stroke();
+    }
+
+    ctx.beginPath(); ctx.arc(WIN_X, WIN_Y, WIN_R+1, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(80,52,28,0.8)'; ctx.lineWidth = 2; ctx.stroke();
+
+    const glass = ctx.createRadialGradient(WIN_X-8, WIN_Y-8, 0, WIN_X, WIN_Y, WIN_R);
+    glass.addColorStop(0,   `rgba(${col.r},${col.g},${col.b},${0.95*intensity})`);
+    glass.addColorStop(0.4, `rgba(${col.r},${col.g},${col.b},${0.65*intensity})`);
+    glass.addColorStop(1,   `rgba(${col.r},${col.g},${col.b},${0.1*intensity})`);
+    ctx.beginPath(); ctx.arc(WIN_X, WIN_Y, WIN_R, 0, Math.PI*2);
+    ctx.fillStyle = glass; ctx.fill();
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(WIN_X, WIN_Y, WIN_R, 0, Math.PI*2); ctx.clip();
+    ctx.strokeStyle = 'rgba(28,20,12,0.7)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(WIN_X-WIN_R, WIN_Y+4); ctx.lineTo(WIN_X+WIN_R, WIN_Y+4);
+    ctx.stroke();
+    ctx.restore();
+
+    const glint = ctx.createRadialGradient(WIN_X-9, WIN_Y-9, 0, WIN_X-9, WIN_Y-9, WIN_R*0.55);
+    glint.addColorStop(0, 'rgba(255,252,230,0.3)');
+    glint.addColorStop(1, 'rgba(255,252,230,0)');
+    ctx.beginPath(); ctx.arc(WIN_X, WIN_Y, WIN_R, 0, Math.PI*2);
+    ctx.fillStyle = glint; ctx.fill();
+    ctx.restore();
+  }
+
+  const PARTICLE_COUNT = 65;
+  const ORBIT_V    = 60;   // px/s — same tangential speed for every moth
+  const LURE_ANGLE = 0.40; // radians — beam must point within this of home direction
+  const OMEGA_HOME = 3.0;  // rad/s — critically damped home spring
+  const DT         = 1/60; // s/frame
+
+  const APPROACH_SPD   = 1.0;              // px/frame — cruise speed (same as orbit)
+  const APPROACH_ACCEL = APPROACH_SPD / 10; // reach cruise in exactly 10 frames
+
+  // Hermite: p(u) = h00*p0 + h10*v0 + h01*p1 + h11*v1  (v0,v1 already tension-scaled)
+  function hermite(u: number, p0: number, v0: number, p1: number, v1: number) {
+    const u2 = u*u, u3 = u2*u;
+    return (2*u3-3*u2+1)*p0 + (u3-2*u2+u)*v0 + (-2*u3+3*u2)*p1 + (u3-u2)*v1;
+  }
+  function hermiteD(u: number, p0: number, v0: number, p1: number, v1: number) {
+    const u2 = u*u;
+    return (6*u2-6*u)*p0 + (3*u2-4*u+1)*v0 + (-6*u2+6*u)*p1 + (3*u2-2*u)*v1;
+  }
+
+  // Returns orbit tangent as unit direction vector (magnitude = 1 px/frame)
+  function orbitTangentDir(dir: 1|-1, theta: number) {
+    return { dx: -dir * Math.sin(theta), dy: dir * Math.cos(theta) };
+  }
+
+  // States: 0=chill, 1=approach, 2=orbit
+  class Particle {
+    x: number; y: number;
+    homeX: number; homeY: number;
+    homeAngle: number;
+    targetS: number;
+    vx = 0; vy = 0;
+    size: number;
+    baseOpacity: number;
+
+    state: 0 | 1 | 2 = 0;
+    entryTheta: number = 0;
+    orbitDir: 1 | -1 = 1;
+    orbitPhaseOffset: number = 0;
+    orbitTheta: number = 0;
+    brightBlend: number = 0;
+    orbitFrames = 0;
+    approachMisalignFrames = 0;
+    // Hermite spline — arc-length parameterized, linear u
+    spU   = 0;    // current parameter [0,1]
+    spDU  = 0.01; // advance per frame = APPROACH_SPD / arcLength
+    spP0x = 0; spP0y = 0; // start position
+    spV0x = 0; spV0y = 0; // start tangent × T0 (T0 = arcLen / APPROACH_SPD)
+    spP1x = 0; spP1y = 0; // end position
+    spV1x = 0; spV1y = 0; // end tangent × T1 (T1 = arcLen / ORBIT_V_PX)
+    spArcLen = 1;          // estimated arc length
+
+    // Cone: R proportional to distance from source
+    get oscR()  { return this.targetS * 0.18; }
+    // ω = v / R — small orbit spins fast, large orbit spins slow, all same linear speed
+    get omega() { return ORBIT_V / Math.max(this.oscR, 1); }
+
+    constructor(i: number) {
+      const fy = canvas.height * 0.78;
+      // Stratified grid + jitter: guarantees even coverage, no clustering
+      const cols = 10, rows = Math.ceil(PARTICLE_COUNT / cols);
+      const col  = i % cols, row = Math.floor(i / cols);
+      this.homeX = ((col + 0.15 + Math.random() * 0.7) / cols) * canvas.width  * 0.92 + canvas.width  * 0.04;
+      this.homeY = ((row + 0.15 + Math.random() * 0.7) / rows) * fy * 0.90 + fy * 0.04;
+      const dx = this.homeX - WIN_X, dy = this.homeY - WIN_Y;
+      this.homeAngle = Math.atan2(dy, dx);
+      this.targetS   = Math.sqrt(dx * dx + dy * dy);
+      this.x = this.homeX + (Math.random() - 0.5) * 20;
+      this.y = this.homeY + (Math.random() - 0.5) * 20;
+      this.size        = Math.random() * 1.0 + 0.3;
+      this.baseOpacity = Math.random() * 0.45 + 0.25;
+    }
+
+    buildSpline(ex: number, ey: number) {
+      // Called only when speed has reached APPROACH_SPD — vx/vy is clean unit direction
+      const d1 = orbitTangentDir(this.orbitDir, this.entryTheta);
+      const ORBIT_V_PX = ORBIT_V / 60;
+
+      // First pass: estimate arc length with T=dist
+      const dist = Math.max(Math.sqrt((ex-this.x)**2 + (ey-this.y)**2), 1);
+      this.spP0x = this.x;          this.spP0y = this.y;
+      this.spV0x = this.vx * dist;  this.spV0y = this.vy * dist;
+      this.spP1x = ex;               this.spP1y = ey;
+      this.spV1x = d1.dx * dist;     this.spV1y = d1.dy * dist;
+
+      let arcLen = 0, px = this.x, py = this.y;
+      for (let i = 1; i <= 12; i++) {
+        const u = i / 12;
+        const nx = hermite(u, this.spP0x, this.spV0x, this.spP1x, this.spV1x);
+        const ny = hermite(u, this.spP0y, this.spV0y, this.spP1y, this.spV1y);
+        arcLen += Math.sqrt((nx-px)**2 + (ny-py)**2);
+        px = nx; py = ny;
+      }
+      arcLen = Math.max(arcLen, 1);
+
+      // Second pass: correct tensions so endpoint speeds are exact
+      // du/frame = APPROACH_SPD / arcLen  →  speed at u=k = |dH/du| * du = T_k * du
+      // T0 = arcLen            → speed at start = APPROACH_SPD ✓
+      // T1 = arcLen * ratio    → speed at end   = ORBIT_V_PX   ✓
+      const T0 = arcLen;
+      const T1 = arcLen * ORBIT_V_PX / APPROACH_SPD;
+      this.spV0x = this.vx * T0;  this.spV0y = this.vy * T0;
+      this.spV1x = d1.dx * T1;    this.spV1y = d1.dy * T1;
+      this.spU  = 0;
+      this.spDU = APPROACH_SPD / arcLen;
+    }
+
+    update() {
+      const now = Date.now(), t = now * 0.001;
+
+      const da = Math.atan2(
+        Math.sin(currentAngle - this.homeAngle),
+        Math.cos(currentAngle - this.homeAngle)
+      );
+      const beamAligned = Math.abs(da) < LURE_ANGLE;
+
+      // Slot on beam — moves with beam angle
+      const bx = Math.cos(currentAngle), by = Math.sin(currentAngle);
+      const restX = WIN_X + bx * this.targetS;
+      const restY = WIN_Y + by * this.targetS;
+
+      if (this.state === 0) {
+        // — CHILL: float around home —
+        if (beamAligned) {
+          const px = -Math.sin(currentAngle), py = Math.cos(currentAngle);
+          const side = (this.x - WIN_X) * px + (this.y - WIN_Y) * py;
+          this.entryTheta = side >= 0 ? 0 : Math.PI;
+          this.orbitDir   = side >= 0 ? 1 : -1;
+          this.spDU = 0; // start in Phase A (accelerate)
+          this.state = 1;
+        } else {
+          // Critically damped spring to home + Brownian noise
+          // ẍ = -ωh²(x−homeX) − 2ωh·ẋ + η
+          const ωh = OMEGA_HOME * DT;
+          this.vx += -ωh*ωh*(this.x - this.homeX) - 2*ωh*this.vx + (Math.random()-0.5)*0.12;
+          this.vy += -ωh*ωh*(this.y - this.homeY) - 2*ωh*this.vy + (Math.random()-0.5)*0.12;
+          this.x  += this.vx; this.y += this.vy;
+        }
+
+      } else if (this.state === 1) {
+        // — APPROACH —
+        if (!beamAligned) {
+          this.approachMisalignFrames++;
+          if (this.approachMisalignFrames > 10) {
+            this.approachMisalignFrames = 0;
+            this.spDU = 0;
+            this.state = 0;
+          }
+          // else: brief misalignment — hold position, don't reset entryTheta
+        } else {
+          this.approachMisalignFrames = 0;
+          const ex = restX + this.oscR * Math.cos(this.entryTheta);
+          const ey = restY + this.oscR * Math.sin(this.entryTheta);
+          const ddx = ex - this.x, ddy = ey - this.y;
+          const dist = Math.sqrt(ddx*ddx + ddy*ddy);
+
+          if (this.spDU === 0) {
+            // Phase A — accelerate straight toward entry point
+            const spd = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+            const newSpd = Math.min(spd + APPROACH_ACCEL, APPROACH_SPD);
+            // Direction: toward entry point
+            const nx = dist > 0.5 ? ddx / dist : this.vx / Math.max(spd, 0.001);
+            const ny = dist > 0.5 ? ddy / dist : this.vy / Math.max(spd, 0.001);
+            this.vx = nx * newSpd;
+            this.vy = ny * newSpd;
+            this.x += this.vx; this.y += this.vy;
+
+            // Once at cruise speed, build spline for the final curve into orbit
+            if (newSpd >= APPROACH_SPD - 0.01) {
+              this.buildSpline(ex, ey);
+            }
+          } else {
+            // Phase B — follow Hermite spline at arc-length constant speed
+            // Recompute if entry point drifted (beam moved)
+            if ((ex - this.spP1x)**2 + (ey - this.spP1y)**2 > 25) {
+              this.vx = hermiteD(this.spU, this.spP0x, this.spV0x, this.spP1x, this.spV1x) * this.spDU;
+              this.vy = hermiteD(this.spU, this.spP0y, this.spV0y, this.spP1y, this.spV1y) * this.spDU;
+              this.x  = hermite(this.spU, this.spP0x, this.spV0x, this.spP1x, this.spV1x);
+              this.y  = hermite(this.spU, this.spP0y, this.spV0y, this.spP1y, this.spV1y);
+              this.buildSpline(ex, ey);
+            }
+
+            this.spU = Math.min(this.spU + this.spDU, 1);
+            this.x = hermite(this.spU, this.spP0x, this.spV0x, this.spP1x, this.spV1x);
+            this.y = hermite(this.spU, this.spP0y, this.spV0y, this.spP1y, this.spV1y);
+
+            if (this.spU >= 1) {
+              // Project onto orbit circle: spP1 may not be exactly oscR from current restXY
+              // (beam drifted during approach). Placing on the circle here means frame N+1
+              // (also on circle, angle+dθ) is exactly 1px away — no boost.
+              const theta = Math.atan2(this.y - restY, this.x - restX);
+              this.x = restX + this.oscR * Math.cos(theta);
+              this.y = restY + this.oscR * Math.sin(theta);
+              this.orbitPhaseOffset = theta - this.orbitDir * this.omega * t;
+              this.orbitTheta = theta;
+              const d = orbitTangentDir(this.orbitDir, theta);
+              this.vx = d.dx * (ORBIT_V / 60);
+              this.vy = d.dy * (ORBIT_V / 60);
+              this.orbitFrames = 0;
+              this.state = 2;
+            }
+          }
+        }
+
+      } else {
+        // — ORBIT: circle around the current beam slot position —
+        this.orbitFrames++;
+        // Hysteresis: must be misaligned for >30 frames before exiting orbit
+        const shouldExit = !beamAligned && this.orbitFrames > 30;
+        if (shouldExit) {
+          this.vx = -this.orbitDir * this.omega * this.oscR * Math.sin(this.orbitTheta) / 60;
+          this.vy =  this.orbitDir * this.omega * this.oscR * Math.cos(this.orbitTheta) / 60;
+          this.orbitFrames = 0;
+          this.state = 0;
+        } else {
+          this.orbitTheta = this.orbitDir * this.omega * t + this.orbitPhaseOffset;
+          this.x = restX + this.oscR * Math.cos(this.orbitTheta);
+          this.y = restY + this.oscR * Math.sin(this.orbitTheta);
+          this.vx = 0; this.vy = 0;
+        }
+      }
+
+      // Brightness: lerp toward orbit brightness at entry point, track orbit directly once there
+      if (this.state === 2) {
+        this.brightBlend = 0.5 + 0.5 * Math.cos(this.orbitTheta);
+      } else {
+        const target = this.state === 1
+          ? (0.5 + 0.5 * Math.cos(this.entryTheta)) // brightness we'll have at entry (1 for θ=0, 0 for θ=π)
+          : 0;
+        this.brightBlend += (target - this.brightBlend) * 0.04;
+      }
+
+      if (this.x < -60 || this.x > canvas.width + 60 || this.y < -60 || this.y > canvas.height + 60) {
+        this.x = this.homeX; this.y = this.homeY;
+        this.vx = 0; this.vy = 0;
+        this.state = 0;
+      }
+    }
+
+    draw() {
+      const tod = getTimeOfDay(), col = timeColor(tod), intensity = rayIntensity(tod);
+      const b    = this.brightBlend; // 0=dim chill, 1=full beam glow — already encodes orbit pulse
+      const glowMult = 1 + b * 2.0;
+      const alpha    = this.baseOpacity * intensity * glowMult;
+      const glowR    = this.size * (3.5 + b * 5.0);
+
+      ctx.save();
+      ctx.globalAlpha = clamp(alpha, 0, 1);
+
+      const grd = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, glowR);
+      grd.addColorStop(0, `rgba(${col.r},${col.g},${col.b},${0.20 + b * 0.22})`);
+      grd.addColorStop(1, `rgba(${col.r},${col.g},${col.b},0)`);
+      ctx.beginPath(); ctx.arc(this.x, this.y, glowR, 0, Math.PI * 2);
+      ctx.fillStyle = grd; ctx.fill();
+
+      const w = Math.round(b * 38);
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fillStyle = `rgb(${Math.min(255,col.r+w)},${Math.min(255,col.g+w)},${Math.min(255,col.b+w)})`;
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  let particles: Particle[] = [];
+
+  const elName    = document.getElementById('hero-name');
+  const elTagline = document.getElementById('hero-tagline');
+  const elSub     = document.getElementById('hero-sub');
+
+  function beamProximity(el: HTMLElement | null) {
+    if (!el) return 0;
+    const r = el.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
+    const ex = r.left + r.width/2  - cr.left;
+    const ey = r.top  + r.height/2 - cr.top;
+    const dist = Math.abs((ex-WIN_X)*Math.sin(currentAngle) - (ey-WIN_Y)*Math.cos(currentAngle));
+    return clamp(1 - dist/180, 0, 1);
+  }
+
+  function updateTextGlow() {
+    const tod = getTimeOfDay(), col = timeColor(tod), intensity = rayIntensity(tod);
+    for (const el of [elName, elTagline, elSub]) {
+      const hit = beamProximity(el) * intensity;
+      el!.style.textShadow = hit > 0.05
+        ? `0 0 ${hit*14}px rgba(${col.r},${col.g},${col.b},${hit*0.7})`
+        : 'none';
+    }
+  }
+
+  function drawStatic() {
+    // Fixed mid-afternoon angle for a warm, readable static scene
+    currentAngle = Math.PI * 0.28;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawRoom();
+    drawRays();
+    // Draw all moths at their home positions with a soft ambient glow
+    const tod = getTimeOfDay(), col = timeColor(tod), intensity = rayIntensity(tod);
+    for (const p of particles) {
+      ctx.save();
+      ctx.globalAlpha = clamp(p.baseOpacity * intensity * 0.7, 0, 1);
+      const glowR = p.size * 4;
+      const grd = ctx.createRadialGradient(p.homeX, p.homeY, 0, p.homeX, p.homeY, glowR);
+      grd.addColorStop(0, `rgba(${col.r},${col.g},${col.b},0.18)`);
+      grd.addColorStop(1, `rgba(${col.r},${col.g},${col.b},0)`);
+      ctx.beginPath(); ctx.arc(p.homeX, p.homeY, glowR, 0, Math.PI * 2);
+      ctx.fillStyle = grd; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.homeX, p.homeY, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = `rgb(${col.r},${col.g},${col.b})`;
+      ctx.fill();
+      ctx.restore();
+    }
+    drawWindow();
+    updateTextGlow();
+  }
+
+  function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    updateAngle();
+    drawRoom();
+    drawRays();
+    particles.forEach(p => { p.update(); p.draw(); });
+    drawWindow();
+    updateTextGlow();
+    requestAnimationFrame(loop);
+  }
+
+  resize();
+  particles = Array.from({ length: PARTICLE_COUNT }, (_, i) => new Particle(i));
+  if (reducedMotion) {
+    drawStatic();
+  } else {
+    loop();
+  }
+</script>
+
+<style>
+  canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  .grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.055;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 300px 300px;
+  }
+
+  .vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 35% 40%, transparent 40%, rgba(10,7,4,0.55) 100%);
+  }
+</style>

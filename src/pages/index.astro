@@ -1,77 +1,86 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import NavCard from '../components/NavCard.astro';
+import DustMotes from '../components/DustMotes.astro';
 ---
 
 <Layout title="Patrick Meunier">
-  <main class="container">
-    <section class="hero">
-      <p class="hero__tagline">Everything is open source if you can read binary, even this website</p>
-      <h1 class="hero__name">Patrick Meunier</h1>
-      <p class="hero__sub">Programmer</p>
-    </section>
+  <section class="hero">
+    <DustMotes />
+    <div class="hero__content">
+      <p class="tagline" id="hero-tagline">Everything is open source if you can read binary, even this website</p>
+      <h1 class="name" id="hero-name">Patrick Meunier</h1>
+      <p class="sub" id="hero-sub">Programmer</p>
+    </div>
 
+  </section>
+
+  <section class="worlds">
     <nav class="nav-grid">
-      <NavCard
-        href="/projects"
-        title="Projects"
-        description="Things I've built and contributed to."
-      />
-      <NavCard
-        href="/blog"
-        title="Blog"
-        description="Long form, when I have something worth saying."
-      />
-      <NavCard
-        href="/graphics"
-        title="Graphics"
-        description="Canvas experiments and visual playgrounds."
-      />
+      <NavCard href="/projects" title="Projects" description="Things I've built and contributed to." />
+      <NavCard href="/blog"     title="Blog"     description="Long form, when I have something worth saying." />
+      <NavCard href="/graphics" title="Graphics" description="Canvas experiments and visual playgrounds." />
     </nav>
-  </main>
+  </section>
 </Layout>
 
 <style>
-  main {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-height: 100vh;
-    gap: var(--space-16);
-    padding-top: var(--space-16);
-    padding-bottom: var(--space-16);
-  }
-
   .hero {
+    position: relative;
+    height: 75vh;
+    min-height: 480px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .hero__content {
+    position: relative;
+    z-index: 1;
+    padding: 0 clamp(1.5rem, 5vw, 4rem);
+    margin-bottom: 5vh;
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: 1rem;
   }
 
-  .hero__tagline {
+  .tagline {
     font-family: var(--font-mono);
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: var(--color-teal);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.03em;
     max-width: none;
+    transition: text-shadow 0.4s ease;
   }
 
-  .hero__name {
-    font-size: 3rem;
+  .name {
+    font-size: clamp(2.2rem, 6vw, 4rem);
     color: var(--color-heading);
     line-height: 1;
+    transition: text-shadow 0.4s ease;
   }
 
-  .hero__sub {
+  .sub {
     font-family: var(--font-mono);
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: var(--color-muted);
     max-width: none;
+    transition: text-shadow 0.4s ease;
+  }
+
+  .worlds {
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-divider);
+    padding: 2.5rem clamp(1.5rem, 5vw, 4rem);
+    height: fit-content;
   }
 
   .nav-grid {
+    max-width: var(--max-width-wide);
+    margin: 0 auto;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--space-4);
+    gap: 1rem;
   }
+
 </style>
